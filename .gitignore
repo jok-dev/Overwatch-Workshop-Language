@@ -1,0 +1,19 @@
+CMakeFiles
+Debug
+Release
+x64
+Profiling
+Overwatch Workshop Language Compiler/Debug
+Overwatch Workshop Language Compiler/Release
+Overwatch Workshop Language Compiler/Profiling
+Overwatch Workshop Language Compiler/x64
+Overwatch Workshop Language Compiler/temp
+enc_temp_folder
+Game.dir
+CMakeCache.txt
+cmake_install.cmake
+.vs
+*.opendb
+*.db
+Overwatch Workshop Language Compiler/My Amplifier Results - Project/
+*.vcxproj.user
