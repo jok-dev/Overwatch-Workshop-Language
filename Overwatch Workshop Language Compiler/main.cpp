@@ -9,9 +9,11 @@
 #include "tokenizer.h"
 #include "dynstr.h"
 
+// @Todo: we could add a printing of the parser intention stack on error?
+
 enum ast_node_type
 {
-	AST_NODE_END,
+	AST_NODE_TYPE_END,
 
 	AST_NODE_TYPE_NUMBER,
 	AST_NODE_TYPE_STRING,
@@ -45,6 +47,9 @@ struct ast_node_data_function_call
 struct ast_node_data_if
 {
 	ast_node* cond;
+
+	u32 then_body_statements_len;
+	ast_node* then_body_statements;
 };
 
 struct ast_node_data_binary
@@ -113,6 +118,11 @@ void parser_unexpected_token_error(token_type expected, const char* expected_val
 	}
 }
 
+bool node_requires_semicolon(ast_node node)
+{
+	return node.statement && node.type != AST_NODE_TYPE_IF && node.type != AST_NODE_TYPE_END;
+}
+
 // @Todo: invalid operators?
 u32 operator_get_precedence(dynstr* op)
 {
@@ -147,6 +157,7 @@ void eat_token(token_type type, const char* value, const char* why)
 }
 
 ast_node parse_expression();
+ast_node parse_statement();
 
 ast_node maybe_parse_function_call(ast_node node);
 
@@ -157,7 +168,7 @@ ast_node parse_string();
 ast_node parse_identifier();
 ast_node parse_function_call(ast_node identifier);
 
-std::vector<ast_node> parse_delimited_list(const char* start_punc, const char* end_punc, const char* delimiter_punc, const char* what)
+std::vector<ast_node> parse_delimited_list(const char* start_punc, const char* end_punc, const char* delimiter_punc, bool statment, const char* what)
 {
 	std::vector<ast_node> list;
 	bool first = true;
@@ -168,10 +179,10 @@ std::vector<ast_node> parse_delimited_list(const char* start_punc, const char* e
 	while(token_peek().type != TOKEN_TYPE_END) 
 	{
 		if(is_next_token(TOKEN_TYPE_PUNCTUATION, end_punc)) break;
-		if(first) first = false; else eat_token(TOKEN_TYPE_PUNCTUATION, delimiter_punc, what);
+		if(first) first = false; else if(!statment && strcmp(delimiter_punc, ";") != 0) eat_token(TOKEN_TYPE_PUNCTUATION, delimiter_punc, what);
 		if(is_next_token(TOKEN_TYPE_PUNCTUATION, end_punc)) break; // the last separator can be missing
 
-		list.push_back(parse_expression());
+		list.push_back(statment ? parse_statement() : parse_expression());
 	}
 
 	eat_token(TOKEN_TYPE_PUNCTUATION, end_punc, what);
@@ -189,7 +200,7 @@ ast_node parse_atom()
 
 	token tok = token_peek();
 
-	ast_node node = { AST_NODE_END };
+	ast_node node = { AST_NODE_TYPE_END };
 
 	if(tok.type == TOKEN_TYPE_END) return node;
 
@@ -265,9 +276,9 @@ ast_node parse_statement()
 	ast_node node = parse_expression();
 	node.statement = true;
 
-	if(node.type != AST_NODE_TYPE_IF)
+	if(node_requires_semicolon(node))
 	{
-		eat_token(TOKEN_TYPE_PUNCTUATION, ";", "end expression");
+		eat_token(TOKEN_TYPE_PUNCTUATION, ";", "end statement");
 	}
 
 	intention.pop();
@@ -284,7 +295,7 @@ ast_node parse_if()
 
 	eat_token(TOKEN_TYPE_PUNCTUATION, "(", "start if condition");
 
-	// @Todo: this is kinda bad,, we never free either?
+	// @Todo: this is kinda bad, we never free either?
 	ast_node* cond = (ast_node*) malloc(sizeof(ast_node));
 
 	// @Todo: instead of this, maybe pass this on to the expression parser?
@@ -296,7 +307,21 @@ ast_node parse_if()
 
 	eat_token(TOKEN_TYPE_PUNCTUATION, ")", "end if condition");
 
-	eat_token(TOKEN_TYPE_PUNCTUATION, "{", "start if body");
+	std::vector<ast_node> list = parse_delimited_list("{", "}", ";", true, "if-then body");
+	ast_node* statements = NULL;
+
+	if(list.size() > 0)
+	{
+		statements = (ast_node*) malloc(sizeof(ast_node) * list.size());
+
+		for(u32 i = 0; i < list.size(); i++)
+		{
+			statements[i] = list[i];
+		}
+	}
+
+	data.then_body_statements = statements;
+	data.then_body_statements_len = list.size();
 
 	ast_node node = {};
 	node.type = AST_NODE_TYPE_IF;
@@ -396,7 +421,7 @@ ast_node parse_function_call(ast_node identifier)
 	data.function_identifier = id_pointer;
 
 	intention.push("parse function arguments");
-	std::vector<ast_node> list = parse_delimited_list("(", ")", ",", "function args");
+	std::vector<ast_node> list = parse_delimited_list("(", ")", ",", false, "function args");
 
 	ast_node* args = NULL;
 	
@@ -445,7 +470,17 @@ dynstr* stringify_ast(ast_node node)
 		case AST_NODE_TYPE_IF:
 		{
 			dynstr* cond = stringify_ast(*node.data.iff.cond);
-			dynstr_append(str, "if(%s)\n", cond->raw);
+			dynstr_append(str, "if(%s)\n{\n", cond->raw);
+
+			for(u32 i = 0; i < node.data.iff.then_body_statements_len; i++)
+			{
+				dynstr* arg = stringify_ast(node.data.iff.then_body_statements[i]);
+				dynstr_append_str(str, "    ");
+				dynstr_append(str, arg);
+				dynstr_destroy(arg);
+			}
+
+			dynstr_append(str, "}\n");
 			dynstr_destroy(cond);
 		} break;
 
@@ -486,7 +521,7 @@ dynstr* stringify_ast(ast_node node)
 		} break;
 	}
 
-	if(node.statement && node.type != AST_NODE_TYPE_IF)
+	if(node_requires_semicolon(node))
 	{
 		dynstr_append(str, ";\n");
 	}
@@ -496,10 +531,10 @@ dynstr* stringify_ast(ast_node node)
 
 int main()
 {
-	tokenizer_init("if(is_game_in_progress() == true) { big_message(event_player, \"chasing\"); }");
+	tokenizer_init("if(this == true) { test(6969); }");
 
 	ast_node node;
-	while((node = parse_statement()).type != AST_NODE_END)
+	while((node = parse_statement()).type != AST_NODE_TYPE_END)
 	{
 		dynstr* str = stringify_ast(node);
 		printf("%s", str->raw);

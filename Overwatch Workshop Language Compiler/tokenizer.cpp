@@ -95,8 +95,8 @@ bool is_punctuation_char(char ch)
 
 bool is_identifier_start_char(char ch)
 {
-	// identifiers can start with anything apart from digits, operators or punctuation
-	return isalpha(ch) || (!is_digit_char(ch) && !is_operator_char(ch) && !is_punctuation_char(ch));
+	// identifiers can start with anything apart from digits, operators or punctuation or space
+	return isalpha(ch) || (!is_digit_char(ch) && !is_operator_char(ch) && !is_punctuation_char(ch) && ch != ' ');
 }
 
 bool is_identifier_char(char ch)
