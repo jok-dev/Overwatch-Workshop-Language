@@ -1,0 +1,3 @@
+event(Event.ONGOING_GLOBAL) {
+	disable_builtin_game_mode_announcer();
+}

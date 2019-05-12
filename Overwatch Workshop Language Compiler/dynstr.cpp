@@ -1,6 +1,6 @@
 #include "dynstr.h"
 
-dynstr* dynstr_create(char* str, u32 str_len, u32 buf_len)
+dynstr* dynstr_create(const char* str, u32 str_len, u32 buf_len)
 {
 	assert(str_len >= 0 && buf_len >= 0 && "You can't have a negatively sized string or buffer");
 
@@ -23,14 +23,14 @@ dynstr* dynstr_create(char* str, u32 str_len, u32 buf_len)
 	return dstr;
 }
 
-dynstr* dynstr_create(char* str, u32 len)
+dynstr* dynstr_create(const char* str, u32 len)
 {
 	assert(len <= UINT16_MAX && "Dynstr only supports strings of length <= 65535");
 
 	return dynstr_create(str, (u16)len, (u16)len);
 }
 
-dynstr* dynstr_create(char* str)
+dynstr* dynstr_create(const char* str)
 {
 	size_t len = strlen(str);
 	assert(len <= UINT16_MAX && "Dynstr only supports strings of length <= 65535");
@@ -100,8 +100,23 @@ dynstr* dynstr_append_char(dynstr* to, char from)
 	return to;
 }
 
+dynstr* dynstr_append_char_repeat(dynstr* to, char from, u32 count)
+{
+	u32 new_len = to->len + count;
+	dynstr_ensure_buflen(to, new_len);
+
+	for(u32 i = 0; i < count; i++)
+	{
+		to->raw[to->len + i] = from;
+	}
+
+	dynstr_set_strlen(to, new_len);
+
+	return to;
+}
+
 // The dynstr pointer will still be valid, but the raw pointer might be invalidated
-dynstr* dynstr_append_str(dynstr* to, char* from, u32 from_len)
+dynstr* dynstr_append_str(dynstr* to, const char* from, u32 from_len)
 {
 	assert(from != 0 && "Cannot append null string");
 
@@ -122,7 +137,7 @@ dynstr* dynstr_append_str(dynstr* to, char* from, u32 from_len)
 	return to;
 }
 
-dynstr* dynstr_append_str(dynstr* to, char* from)
+dynstr* dynstr_append_str(dynstr* to, const char* from)
 {
 	size_t from_len = strlen(from);
 
@@ -142,7 +157,7 @@ dynstr* dynstr_append_int(dynstr* to, int from)
 	return to;
 }
 
-dynstr* dynstr_append_va(dynstr* to, char* format, va_list args)
+dynstr* dynstr_append_va(dynstr* to, const char* format, va_list args)
 {
 	u32 arg_index = 0;
 
@@ -185,7 +200,7 @@ dynstr* dynstr_append_va(dynstr* to, char* format, va_list args)
 	return to;
 }
 
-dynstr* dynstr_append(dynstr* to, char* format, ...)
+dynstr* dynstr_append(dynstr* to, const char* format, ...)
 {
 	va_list args;
 	va_start(args, format);

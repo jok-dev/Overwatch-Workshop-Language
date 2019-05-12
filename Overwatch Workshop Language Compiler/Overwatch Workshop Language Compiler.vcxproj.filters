@@ -30,6 +30,9 @@
     <ClCompile Include="test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dynstr.h">
@@ -39,6 +42,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="tokenizer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="file.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

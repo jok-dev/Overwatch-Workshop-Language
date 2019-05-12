@@ -27,4 +27,5 @@ const char* token_type_get_name(token_type type);
 token token_next();
 token token_peek();
 
-u64 tokenizer_get_pos();
+u64 tokenizer_get_current_line();
+u64 tokenizer_get_current_line_pos();

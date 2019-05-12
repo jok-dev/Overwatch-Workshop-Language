@@ -8,6 +8,7 @@
 
 #include "tokenizer.h"
 #include "dynstr.h"
+#include "file.h"
 
 // @Todo: we could add a printing of the parser intention stack on error?
 
@@ -21,7 +22,9 @@ enum ast_node_type
 	AST_NODE_TYPE_BOOLEAN,
 	AST_NODE_TYPE_FUNCTION_CALL,
 	AST_NODE_TYPE_IF,
-	AST_NODE_TYPE_BINARY
+	AST_NODE_TYPE_EVENT,
+	AST_NODE_TYPE_BINARY,
+	AST_NODE_TYPE_MEMBER_ACCESS,
 };
 
 struct ast_node;
@@ -34,6 +37,12 @@ struct ast_node_data_simple
 struct ast_node_data_bool
 {
 	bool value;
+};
+
+struct ast_node_data_member_access
+{
+	ast_node* owner;
+	ast_node* member;
 };
 
 struct ast_node_data_function_call
@@ -50,6 +59,15 @@ struct ast_node_data_if
 
 	u32 then_body_statements_len;
 	ast_node* then_body_statements;
+};
+
+struct ast_node_data_event
+{
+	u32 args_len;
+	ast_node* args;
+
+	u32 body_statements_len;
+	ast_node* body_statements;
 };
 
 struct ast_node_data_binary
@@ -69,9 +87,12 @@ union ast_node_data
 
 	ast_node_data_bool boolean;
 
+	ast_node_data_member_access member_access;
 	ast_node_data_function_call fcall;
 
-	ast_node_data_if iff;
+	ast_node_data_event event_statement;
+	ast_node_data_if if_statement;
+
 	ast_node_data_binary binary;
 };
 
@@ -95,7 +116,7 @@ void parser_error(const char* error, ...)
 	vprintf(error, args);
 
 	// @Todo: line support
-	printf(" while %s at %i:%i\n", intention.top(), 0, tokenizer_get_pos());
+	printf(" while %s at %i:%i\n", intention.top(), tokenizer_get_current_line(), tokenizer_get_current_line_pos());
 
 	va_end(args);
 
@@ -103,27 +124,45 @@ void parser_error(const char* error, ...)
 	exit(0);
 }
 
-void parser_unexpected_token_error(token_type expected, const char* expected_value, const char* why_expected)
+void parser_unexpected_token_error(token_type expected, const char* expected_value, bool has_value, const char* why_expected, va_list why_expected_args)
 {
 	token tok = token_peek();
 
-	if(tok.type != TOKEN_TYPE_END)
+	dynstr* why_expected_formatted = dynstr_create(30);
+	dynstr_append_va(why_expected_formatted, why_expected, why_expected_args);
+
+	dynstr* expected_formatted = dynstr_create(30);
+	dynstr_append(expected_formatted, has_value ? "'%s'" : "%s", has_value ? expected_value : token_type_get_name(expected));
+
+	if(tok.type != TOKEN_TYPE_END && tok.type != TOKEN_TYPE_STRING)
 	{
-		parser_error("Unexpected token '%s', expected '%s' (to %s)", tok.value->raw, expected_value, why_expected);
+		parser_error("Unexpected token '%s', expected %s (to %s)", tok.value->raw, expected_formatted->raw, why_expected_formatted->raw);
 	}
 	else
 	{
-		parser_error("Unexpected %s, expected '%s' (to %s)", token_type_get_name(tok.type),
-			expected_value, why_expected);
+		parser_error("Unexpected %s, expected %s (to %s)", token_type_get_name(tok.type),
+			expected_formatted->raw, why_expected_formatted->raw);
 	}
+
+	dynstr_destroy(why_expected_formatted);
+	dynstr_destroy(expected_formatted);
+}
+
+void parser_unexpected_token_error(token_type expected, const char* expected_value, const char* why_expected, va_list why_expected_args)
+{
+	parser_unexpected_token_error(expected, expected_value, true, why_expected, why_expected_args);
+}
+
+void parser_unexpected_token_error(token_type expected, const char* why_expected, va_list why_expected_args)
+{
+	parser_unexpected_token_error(expected, 0, false, why_expected, why_expected_args);
 }
 
 bool node_requires_semicolon(ast_node node)
 {
-	return node.statement && node.type != AST_NODE_TYPE_IF && node.type != AST_NODE_TYPE_END;
+	return node.statement && node.type != AST_NODE_TYPE_IF && node.type != AST_NODE_TYPE_EVENT && node.type != AST_NODE_TYPE_END;
 }
 
-// @Todo: invalid operators?
 u32 operator_get_precedence(dynstr* op)
 {
 	if(dynstr_equals(op, "=")) return 1;
@@ -149,23 +188,48 @@ bool is_next_token(token_type type, const char* value)
 	return tok.type == type && dynstr_equals(tok.value, value);
 }
 
-void eat_token(token_type type, const char* value, const char* why)
+token eat_token(token_type type, const char* value, const char* why, ...)
 {
-	if(!is_next_token(type, value)) parser_unexpected_token_error(type, value, why);
+	va_list args;
+	va_start(args, why);
 
+	if(!is_next_token(type, value)) parser_unexpected_token_error(type, value, why, args);
+
+	token tok = token_peek();
 	token_next();
+
+	va_end(args);
+
+	return tok;
+}
+
+token eat_token(token_type type, const char* why, ...)
+{
+	va_list args;
+	va_start(args, why);
+
+	if(!is_next_token(type)) parser_unexpected_token_error(type, why, args);
+
+	token tok = token_peek();
+	token_next();
+
+	va_end(args);
+
+	return tok;
 }
 
 ast_node parse_expression();
 ast_node parse_statement();
 
-ast_node maybe_parse_function_call(ast_node node);
+ast_node maybe_parse_extras(ast_node node);
 
 ast_node parse_if();
+ast_node parse_event();
 ast_node parse_bool();
-ast_node parse_digit();
-ast_node parse_string();
-ast_node parse_identifier();
+ast_node parse_digit(token tok);
+ast_node parse_string(token tok);
+ast_node parse_identifier(token tok);
+ast_node parse_member_access(ast_node identifier);
 ast_node parse_function_call(ast_node identifier);
 
 std::vector<ast_node> parse_delimited_list(const char* start_punc, const char* end_punc, const char* delimiter_punc, bool statment, const char* what)
@@ -173,21 +237,37 @@ std::vector<ast_node> parse_delimited_list(const char* start_punc, const char* e
 	std::vector<ast_node> list;
 	bool first = true;
 
-	// @Todo: use ("start %s", what)   ???
-	eat_token(TOKEN_TYPE_PUNCTUATION, start_punc, what);
+	eat_token(TOKEN_TYPE_PUNCTUATION, start_punc, "start %s", what);
 
 	while(token_peek().type != TOKEN_TYPE_END) 
 	{
 		if(is_next_token(TOKEN_TYPE_PUNCTUATION, end_punc)) break;
-		if(first) first = false; else if(!statment && strcmp(delimiter_punc, ";") != 0) eat_token(TOKEN_TYPE_PUNCTUATION, delimiter_punc, what);
+		if(first) first = false; else if(!statment && strcmp(delimiter_punc, ";") != 0) eat_token(TOKEN_TYPE_PUNCTUATION, delimiter_punc, "give next %s", what);
 		if(is_next_token(TOKEN_TYPE_PUNCTUATION, end_punc)) break; // the last separator can be missing
 
 		list.push_back(statment ? parse_statement() : parse_expression());
 	}
 
-	eat_token(TOKEN_TYPE_PUNCTUATION, end_punc, what);
+	eat_token(TOKEN_TYPE_PUNCTUATION, end_punc, "end %s", what);
 
 	return list;
+}
+
+ast_node* ast_node_list_to_array(std::vector<ast_node> list)
+{
+	ast_node* arr = NULL;
+
+	if(list.size() > 0)
+	{
+		arr = (ast_node*)malloc(sizeof(ast_node) * list.size());
+
+		for(u32 i = 0; i < list.size(); i++)
+		{
+			arr[i] = list[i];
+		}
+	}
+
+	return arr;
 }
 
 ast_node parse_atom()
@@ -196,6 +276,7 @@ ast_node parse_atom()
 	// @Todo: allow people to use () to change precedence?
 
 	if(is_next_token(TOKEN_TYPE_KEYWORD, "if")) return parse_if();
+	if(is_next_token(TOKEN_TYPE_KEYWORD, "event")) return parse_event();
 	if(is_next_token(TOKEN_TYPE_KEYWORD, "true") || is_next_token(TOKEN_TYPE_KEYWORD, "false")) return parse_bool();
 
 	token tok = token_peek();
@@ -206,16 +287,16 @@ ast_node parse_atom()
 
 	switch(tok.type)
 	{
-		case TOKEN_TYPE_DIGIT: node = parse_digit(); break;
-		case TOKEN_TYPE_STRING: node = parse_string(); break;
-		case TOKEN_TYPE_IDENTIFIER: node = parse_identifier(); break;
+		case TOKEN_TYPE_DIGIT: node = parse_digit(tok); break;
+		case TOKEN_TYPE_STRING: node = parse_string(tok); break;
+		case TOKEN_TYPE_IDENTIFIER: node = parse_identifier(tok); break;
 
 		default: parser_error("Unable to parse token '%s' of type '%s'", tok.value->raw, token_type_get_name(tok.type));
 	}
 
 	token_next();
 
-	return maybe_parse_function_call(node);
+	return maybe_parse_extras(node);
 }
 
 ast_node maybe_parse_binary(ast_node left, u32 precedence)
@@ -252,17 +333,29 @@ ast_node maybe_parse_binary(ast_node left, u32 precedence)
 	return left;
 }
 
+ast_node maybe_parse_member_access(ast_node node)
+{
+	if(is_next_token(TOKEN_TYPE_PUNCTUATION, ".")) return parse_member_access(node);
+
+	return node;
+}
+
 ast_node maybe_parse_function_call(ast_node node)
 {
 	if(is_next_token(TOKEN_TYPE_PUNCTUATION, "(")) return parse_function_call(node);
-	
+
 	return node;
+}
+
+ast_node maybe_parse_extras(ast_node node)
+{
+	return maybe_parse_member_access(maybe_parse_function_call(node));
 }
 
 ast_node parse_expression()
 {
 	intention.push("parsing expression");
-	ast_node node = maybe_parse_function_call(maybe_parse_binary(parse_atom(), 0));
+	ast_node node = maybe_parse_extras(maybe_parse_binary(parse_atom(), 0));
 	intention.pop();
 	return node;
 }
@@ -308,24 +401,36 @@ ast_node parse_if()
 	eat_token(TOKEN_TYPE_PUNCTUATION, ")", "end if condition");
 
 	std::vector<ast_node> list = parse_delimited_list("{", "}", ";", true, "if-then body");
-	ast_node* statements = NULL;
-
-	if(list.size() > 0)
-	{
-		statements = (ast_node*) malloc(sizeof(ast_node) * list.size());
-
-		for(u32 i = 0; i < list.size(); i++)
-		{
-			statements[i] = list[i];
-		}
-	}
-
-	data.then_body_statements = statements;
+	
+	data.then_body_statements = ast_node_list_to_array(list);
 	data.then_body_statements_len = list.size();
 
 	ast_node node = {};
 	node.type = AST_NODE_TYPE_IF;
-	node.data.iff = data;
+	node.data.if_statement = data;
+
+	intention.pop();
+	return node;
+}
+
+ast_node parse_event()
+{
+	intention.push("parsing event statement");
+
+	ast_node node = {};
+	node.type = AST_NODE_TYPE_EVENT;
+
+	eat_token(TOKEN_TYPE_KEYWORD, "event", "start event statement");
+
+	std::vector<ast_node> args_list = parse_delimited_list("(", ")", ",", false, "event arguments");
+
+	node.data.event_statement.args = ast_node_list_to_array(args_list);
+	node.data.event_statement.args_len = args_list.size();
+
+	std::vector<ast_node> body_list = parse_delimited_list("{", "}", ";", true, "event body");
+
+	node.data.event_statement.body_statements = ast_node_list_to_array(body_list);
+	node.data.event_statement.body_statements_len = body_list.size();
 
 	intention.pop();
 	return node;
@@ -351,11 +456,9 @@ ast_node parse_bool()
 	return node;
 }
 
-ast_node parse_digit()
+ast_node parse_digit(token tok)
 {
 	intention.push("parsing digit");
-
-	token tok = token_peek();
 
 	ast_node node = {};
 
@@ -370,11 +473,9 @@ ast_node parse_digit()
 	return node;
 }
 
-ast_node parse_string()
+ast_node parse_string(token tok)
 {
 	intention.push("parsing string");
-
-	token tok = token_peek();
 
 	ast_node_data_simple data = {};
 	data.value = dynstr_create(tok.value);
@@ -387,11 +488,9 @@ ast_node parse_string()
 	return node;
 }
 
-ast_node parse_identifier()
+ast_node parse_identifier(token tok)
 {
 	intention.push("parsing identifier");
-
-	token tok = token_peek();
 
 	ast_node node = {};
 	node.type = AST_NODE_TYPE_IDENTIFIER;
@@ -400,6 +499,30 @@ ast_node parse_identifier()
 	data.value = dynstr_create(tok.value);
 
 	node.data.identifier = data;
+
+	intention.pop();
+	return node;
+}
+
+ast_node parse_member_access(ast_node owner)
+{
+	intention.push("parsing member access");
+
+	ast_node node = {};
+	node.type = AST_NODE_TYPE_MEMBER_ACCESS;
+
+	eat_token(TOKEN_TYPE_PUNCTUATION, ".", "access member");
+
+	ast_node_data_member_access data = {};
+	ast_node* owner_pointer = (ast_node*) malloc(sizeof(ast_node));
+	*owner_pointer = owner;
+	data.owner = owner_pointer;
+
+	ast_node* member_pointer = (ast_node*) malloc(sizeof(ast_node));
+	*member_pointer = parse_identifier(eat_token(TOKEN_TYPE_IDENTIFIER, "specify member"));
+	data.member = member_pointer;
+
+	node.data.member_access = data;
 
 	intention.pop();
 	return node;
@@ -420,25 +543,10 @@ ast_node parse_function_call(ast_node identifier)
 	*id_pointer = identifier;
 	data.function_identifier = id_pointer;
 
-	intention.push("parse function arguments");
 	std::vector<ast_node> list = parse_delimited_list("(", ")", ",", false, "function args");
 
-	ast_node* args = NULL;
-	
-	if(list.size() > 0)
-	{
-		args = (ast_node*) malloc(sizeof(ast_node) * list.size());
-
-		for(u32 i = 0; i < list.size(); i++)
-		{
-			args[i] = list[i];
-		}
-	}
-
-	data.args = args;
+	data.args = ast_node_list_to_array(list);
 	data.args_len = list.size();
-
-	intention.pop();
 
 	node.data.fcall = data;
 
@@ -446,7 +554,7 @@ ast_node parse_function_call(ast_node identifier)
 	return node;
 }
 
-dynstr* stringify_ast(ast_node node)
+dynstr* stringify_ast_as_code(ast_node node)
 {
 	dynstr* str = dynstr_create(20);
 
@@ -454,7 +562,7 @@ dynstr* stringify_ast(ast_node node)
 	{
 		case AST_NODE_TYPE_NUMBER:
 		{
-			dynstr_append(str, "number(%s)", node.data.number.value->raw);
+			dynstr_append(str, "%s", node.data.number.value->raw);
 		} break;
 
 		case AST_NODE_TYPE_STRING:
@@ -469,12 +577,12 @@ dynstr* stringify_ast(ast_node node)
 
 		case AST_NODE_TYPE_IF:
 		{
-			dynstr* cond = stringify_ast(*node.data.iff.cond);
+			dynstr* cond = stringify_ast_as_code(*node.data.if_statement.cond);
 			dynstr_append(str, "if(%s)\n{\n", cond->raw);
 
-			for(u32 i = 0; i < node.data.iff.then_body_statements_len; i++)
+			for(u32 i = 0; i < node.data.if_statement.then_body_statements_len; i++)
 			{
-				dynstr* arg = stringify_ast(node.data.iff.then_body_statements[i]);
+				dynstr* arg = stringify_ast_as_code(node.data.if_statement.then_body_statements[i]);
 				dynstr_append_str(str, "    ");
 				dynstr_append(str, arg);
 				dynstr_destroy(arg);
@@ -484,10 +592,34 @@ dynstr* stringify_ast(ast_node node)
 			dynstr_destroy(cond);
 		} break;
 
+		case AST_NODE_TYPE_EVENT:
+		{
+			dynstr_append(str, "event(");
+
+			for(u32 i = 0; i < node.data.event_statement.args_len; i++)
+			{
+				dynstr* arg = stringify_ast_as_code(node.data.event_statement.args[i]);
+				dynstr_append(str, arg);
+				dynstr_destroy(arg);
+			}
+
+			dynstr_append(str, ") {\n");
+
+			for(u32 i = 0; i < node.data.event_statement.body_statements_len; i++)
+			{
+				dynstr* arg = stringify_ast_as_code(node.data.event_statement.body_statements[i]);
+				dynstr_append_str(str, "    ");
+				dynstr_append(str, arg);
+				dynstr_destroy(arg);
+			}
+
+			dynstr_append(str, "}\n");
+		} break;
+
 		case AST_NODE_TYPE_BINARY:
 		{
-			dynstr* left = stringify_ast(*node.data.binary.left);
-			dynstr* right = stringify_ast(*node.data.binary.right);
+			dynstr* left = stringify_ast_as_code(*node.data.binary.left);
+			dynstr* right = stringify_ast_as_code(*node.data.binary.right);
 
 			dynstr_append(str, "%s %s %s", left->raw, node.data.binary.op->raw, right->raw);
 
@@ -500,15 +632,23 @@ dynstr* stringify_ast(ast_node node)
 			dynstr_append(str, node.data.identifier.value);
 		} break;
 
+		case AST_NODE_TYPE_MEMBER_ACCESS:
+		{
+			dynstr* owner = stringify_ast_as_code(*node.data.member_access.owner);
+			dynstr* member = stringify_ast_as_code(*node.data.member_access.member);
+
+			dynstr_append(str, "%s.%s", owner->raw, member->raw);
+		} break;
+
 		case AST_NODE_TYPE_FUNCTION_CALL:
 		{
-			dynstr* fid = stringify_ast(*node.data.fcall.function_identifier);
+			dynstr* fid = stringify_ast_as_code(*node.data.fcall.function_identifier);
 
 			dynstr_append(str, "%s(", fid->raw);
 
 			for(u32 i = 0; i < node.data.fcall.args_len; i++)
 			{
-				dynstr* arg = stringify_ast(node.data.fcall.args[i]);
+				dynstr* arg = stringify_ast_as_code(node.data.fcall.args[i]);
 				dynstr_append(str, arg);
 				dynstr_destroy(arg);
 
@@ -529,17 +669,134 @@ dynstr* stringify_ast(ast_node node)
 	return str;
 }
 
+dynstr* stringify_ast_as_tree(ast_node node, u32 depth)
+{
+	dynstr* str = dynstr_create(20);
+
+	switch(node.type)
+	{
+		case AST_NODE_TYPE_NUMBER:
+		{
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "number %s", node.data.number.value->raw);
+		} break;
+
+		case AST_NODE_TYPE_STRING:
+		{
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "string \"%s\"", node.data.string.value->raw);
+		} break;
+
+		case AST_NODE_TYPE_BOOLEAN:
+		{
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "boolean %s", node.data.boolean.value ? "true" : "false");
+		} break;
+
+		case AST_NODE_TYPE_IF:
+		{
+			dynstr* cond = stringify_ast_as_tree(*node.data.if_statement.cond, depth + 1);
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "if:\n");
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "cond: \n    %s\n", cond->raw);
+
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "then body:\n");
+
+			for(u32 i = 0; i < node.data.if_statement.then_body_statements_len; i++)
+			{
+				dynstr* arg = stringify_ast_as_tree(node.data.if_statement.then_body_statements[i], depth + 2);
+				dynstr_append(str, arg);
+				dynstr_destroy(arg);
+			}
+
+			// @Todo: print body
+
+			dynstr_destroy(cond);
+		} break;
+
+		case AST_NODE_TYPE_BINARY:
+		{
+			dynstr* left = stringify_ast_as_tree(*node.data.binary.left, depth + 2);
+			dynstr* right = stringify_ast_as_tree(*node.data.binary.right, depth + 2);
+
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "operation %s:\n", node.data.binary.op->raw);
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "left:\n%s\n", left->raw);
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "right:\n%s", right->raw); 
+		
+			dynstr_destroy(left);
+			dynstr_destroy(right);
+		} break;
+
+		case AST_NODE_TYPE_IDENTIFIER:
+		{
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "identifier %s", node.data.identifier.value->raw);
+		} break;
+
+		case AST_NODE_TYPE_MEMBER_ACCESS:
+		{
+			dynstr* owner = stringify_ast_as_tree(*node.data.member_access.owner, depth + 2);
+			dynstr* member = stringify_ast_as_tree(*node.data.member_access.member, depth + 2);
+
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "member access\n");
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "owner:\n%s\n", owner->raw);
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "member:\n%s", member->raw);
+		} break;
+
+		case AST_NODE_TYPE_FUNCTION_CALL:
+		{
+			dynstr* fid = stringify_ast_as_tree(*node.data.fcall.function_identifier, depth + 2);
+
+			dynstr_append_char_repeat(str, ' ', 4 * depth);
+			dynstr_append(str, "function call:\n");
+			dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+			dynstr_append(str, "fid: \n%s", fid->raw);
+
+			for(u32 i = 0; i < node.data.fcall.args_len; i++)
+			{
+				dynstr_append_char(str, '\n');
+				dynstr_append_char_repeat(str, ' ', 4 * depth + 4);
+				dynstr_append(str, "arg %i: \n", i);
+				dynstr* arg = stringify_ast_as_tree(node.data.fcall.args[i], depth + 2);
+				dynstr_append(str, arg);
+				dynstr_destroy(arg);
+			}
+
+			dynstr_destroy(fid);
+		} break;
+	}
+
+	return str;
+}
+
+dynstr* stringify_ast_as_tree(ast_node node)
+{
+	return stringify_ast_as_tree(node, 0);
+}
+
 int main()
 {
-	tokenizer_init("if(this == true) { test(6969); }");
+	file_data* file = file_load("../example scripts/lucio_chased.wss");
+
+	tokenizer_init((char*) file->data);
 
 	ast_node node;
 	while((node = parse_statement()).type != AST_NODE_TYPE_END)
 	{
-		dynstr* str = stringify_ast(node);
+		dynstr* str = stringify_ast_as_code(node);
 		printf("%s", str->raw);
 		dynstr_destroy(str);
 	}
+
+	file_destroy(file);
 
 	printf("\n");
 

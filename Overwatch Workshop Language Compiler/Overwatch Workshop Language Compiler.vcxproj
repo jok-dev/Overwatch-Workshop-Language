@@ -128,6 +128,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dynstr.cpp" />
+    <ClCompile Include="file.cpp" />
     <ClCompile Include="general.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="test.cpp" />
@@ -135,6 +136,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dynstr.h" />
+    <ClInclude Include="file.h" />
     <ClInclude Include="general.h" />
     <ClInclude Include="tokenizer.h" />
   </ItemGroup>

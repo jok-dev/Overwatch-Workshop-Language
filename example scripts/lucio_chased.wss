@@ -1,0 +1,223 @@
+// What this language provides
+// 
+// - Proper copy paste, bring your own editor!
+// - Proper documentation
+// - shorter, more consistent, and readable syntax. Specifically:
+//    - better syntax for getting data of an object (instead of x_component_of(v) you can use v.x, player.pos 
+//       instead of position_of(player), etc)
+//    - less event duplications, one event can have multiple if statements that will be expanded in-game
+//    - better syntax for getting and setting global and player variables (P = false instead of 
+//       set_global_variable(p, false), player.A = true instead of set_player_variable(player, A, true))
+//    - support for math symbols (+, -, *, /, % (modulo) etc) on numbers and vectors, 
+//       as well as boolean operators (&&, ||, !, etc) instead of using functions (add, modulo, and, or, etc)
+//
+
+// Types
+// 
+// There's a few different types, objects (they have instances and members, members are shortcuts of functions that can be 
+//  performed on the "object"), enums (lists of values), and then 
+//  primitives (numbers, strings)
+//
+// Objects:
+// 
+// Player {
+//   vec pos;
+//   bool spawned;
+//   Team team;
+// }
+// 
+// Vector {
+//    num x;
+//    num y;
+//    num z;
+// }
+//
+// Enums:
+//
+// Team {
+//	 TEAM_1,
+//   TEAM_2,
+//   ALL
+// }
+//
+// Color {
+//	 RED,
+//   BLUE	
+// }
+//
+
+// Notes on how stuff will work
+//
+// - the syntax is very java-like
+// - "all_teams()", "hero()" and other various constants use enum-like-syntax
+// - vector constants are shortened to vec and x_component_of(v) is supported, but v.x is way cleaner and also supported
+// - use of string("", NULL, NULL, NULL) is still supported, but it's encouraged to use "" for strings without replacements
+//    and fstr("{0}", NULL) for strings with replacements explained further below
+// - strings will defined as string constants, like "string" although currently only a few hard-coded strings are 
+//    able to be used (and we should check on compile that the string used exists). For strings with replacement variables
+//    fstr("{0}", NULL, NULL) which supports replacement strings but has variable argument length (0 to 3 replacement arguments)
+//
+
+// Future stuff to think about
+// 
+// - support else statements?
+// - you can't set object members, right?
+// - members are just values right, not callable functions??
+// - when we do say player.x, or player.X, the capital letter means we want a register, and the lowercase means we want a member
+//    idk that we want to call it a "member", but basically members are shortcuts, so for example player.pos is a shortcut to 
+//    position_of(player), and vector.x is a shortcut to x_component_of(vector), these have to be implemented explicitly
+//    and should be shown in the documentation
+// - are we gonna merge all Reevaluations into one enum? how will we check if that one can be used with current method?
+// - as well as embedded ifs, how about ternary support? (condition ? if true : if false)
+// - allow embedded ifs? (i think this might be outside the scope of this project, and add more confusion) but it could be
+//    very powerful, reducing the amount of code that is duplicated
+// - functions? as above, this too could reduce duplicated code, but could make things very complicated.. we shall see!
+// - allow omit () for functions with no args like the in game editor does (e.g. is_game_in_progress has no brackets)
+//    how would this collide with named variables if we add that???
+// - allow implicit == true?
+// - support for boolean operators instead of explicitly using boolean functions (eg, allow ! instead of not())
+// - support proper brackets for operations?
+// - maybe instead of requiring str() always, allow "!!!" strings like that and require something like fstr("{0}", value)
+//    for strings with variables
+// - in create_hud_text there is a location field, how will we determine to call this something more appropriate like HudLocation
+//    (this is an example of a common problem we may have)
+// - it's possible that we could have an automatic thing that reads all the possible Enums, conditions and methods, and then like
+//    MCP does with MC, rename stuff to more appropriate things? it would basically be like a decompiler, and the advantage of this
+//    is that you probably get easier forwards-compatibility with any "api" changes!
+// - should we give an error or warning if someone sets a replacement variable in a string without a corresponding {0}, {1} etc?
+// - should we allow people to omit str() and just use "" if there is no replacements? should we use another
+//    syntax for replacements like "string".format() or something? seems like a small issue, but could improve readability
+// - is the -> used for event definitions really nessisary? 
+// - Should enums be Team or Teams (with an s)?
+// - Support for named variables, and just allocate them to different letters. this could be weird though, 
+//    since it forces you to only support a max of 26 possible named varibles for global and player vars...
+//    What if the player just wants to use regular "registers" (let's call them that), how do we stop other code
+//    overwriting that? 
+// - The reason why named variables would be awesome is because we could have strict type checking!
+// - A possiblity would be the ability to free named variables, so if you use a named variable and have finished with
+//    it and want another, you can just release it back and that register can be used again... this needs more thinking
+// - I think in addition to the above you could do it like C does, any variable _defined_ in a scope (say you define)
+//    a vector with "vec my_vector;" in an event, this variable is only accessable in that event scope (this would also
+//    be the same in ifs, if you define a var in an if, it's only accessable in that if. After you go out of scope,
+//    the register is released and can be used again. Globals defined in global scope will be around forever, unless 
+//    we add support for releasing globals, but that makes variable checking not strict and harder (or maybe impossible)
+//    to check at compiletime.
+//  - Maybe instead of allowing you to release globals, if you need more variables you just have to use and manage 
+//     the registers yourself (but you have to register which registers you want the program not to use?, 
+//     or maybe we could check which ones you reference, or maybe you can release registers too?)
+//  - Absolutely no idea how this would work for players... how can we typecheck variables and give them names if we dont
+//     know which player has certain variables.. very odd..
+//
+
+
+// The below example is based on Lucio Chased by discord user semtimmy#4618 (share code: WF0GV)
+
+event(Event.ONGOING_GLOBAL) {
+	// disable logic
+	if(is_game_in_progress() == true) {
+		disable_builtin_game_mode_announcer();
+		disable_builtin_game_mode_scoring();
+		disable_builtin_game_mode_completion();
+		disable_builtin_game_mode_respawning(players_on_hero(Hero.LUCIO), Team.ALL);
+	}
+
+	// set teamscore to players alive
+	if(is_game_in_progress() == true) {
+		R = number_of_living_players(Team.TEAM_1);
+		C = number_of_living_players(Team.TEAM_2);
+	}
+
+	// setup pickup
+	create_effect(all_players(Team.ALL), Effect.LIGHT_SHAFT, Color.WHITE, 
+		P, 5, Reevaluation.VISIBLE_TO_POSITION_AND_SCALE);
+
+	create_inworld_text(all_players(Team.ALL), "!!!", P + up(), 3, 
+		Clipping.DO_NOT_CLIP, Reevaluation.VISIBLE_TO_POSITION_AND_STRING);
+
+	P = vec(10000, 10000, 10000);
+
+	// randomize pickup spawning
+	if(is_game_in_progress() && match_time() % 20 < 0.1) {
+		S = random_integer(1, 5);
+	}
+}
+
+event(Event.ONGOING_PLAYER, Team.ALL, Player.ALL) {
+	// setup hud
+	create_hud_text(event_player, "ability", event_player.A, HudLocation.LEFT, 
+		0, Color.GREEN, Color.WHITE, Color.WHITE, Reevaluation.VISIBLE_TO_AND_STRING);
+
+	create_hud_text(event_player, fstr("{0} - {1}", "chased", "chasing"), 
+		null, null, HudLocation.TOP, 0, Color.WHITE, Color.WHITE, Color.WHITE, 
+		Reevaluation.VISIBLE_TO_AND_STRING);
+
+	create_hud_text(event_plyer, fstr("{0} vs {1}", "chased", "chasing"), null, null,
+		HudLocation.TOP, 0, Color.WHITE, Color.WHITE, Color.WHITE, 
+		Reevaluation.VISIBLE_TO_AND_STRING);
+
+	// give taggers orbs
+	if(event_player.spawned == true && event_player.team == Team.TEAM_2 && is_game_in_progress() == true) {
+		create_effect(all_players(Team.TEAM_1), Effect.ORB, Color.RED, 
+			event_player.pos + vec(0, 2, 0), 5, Reevaluation.VISIBLE_TO_POSITION_AND_SCALE);
+
+		big_message(event_player, "chasing");
+	}
+
+	// give runners orbs
+	if(event_player.spawned && event_player.team == Team.TEAM_1 && is_game_in_progress()) {
+		create_effect(all_players(Team.TEAM_2), Effect.ORB, Color.BLUE, 
+			event_player.pos + vec(0, 2, 0), 5, Reevaluation.VISIBLE_TO_POSITION_AND_SCALE);
+
+		big_message(event_player, "chased");
+	}
+
+	// runners ability
+	if(is_button_held(event_player, Button.INTERACT) == true && event_player.A == true && event_player.team == Team.TEAM_1) {
+		event_player.A = false;
+		set_status(all_players(Team.TEAM_2), null, Status.HACKED, 1.5);
+		big_message(all_players(Team.TEAM_1), "hacking");
+	}
+
+	// taggers ability
+	if(is_button_held(event_player, Button.INTERACT) == true && event_player.A == true && team_of(event_player) == Team.TEAM_2) {
+		event_player.A = false;
+		create_icon(all_players(Team.TEAM_2), farthest_player_from(event_player, Team.ALL), Icon.EYE,
+			Reevaluation.VISIBLE_TO_AND_POSITION, Color.RED, true);
+		wait(5, WaitBehavior.IGNORE_CONDITION);
+		destroy_icon(last_created_entity());
+	}
+
+	// give ability to player
+	if(distance_between(vec(event_player.pos.x, 0, event_player.pos.z), vec(P.x, 0, P.z)) <= 5.2) {
+		event_player.A = true;
+		P = vec(10000, 10000, 10000);
+		play_effect(event_player, Effect.IMPACT_BUFF_SOUND, Color.WHITE, event_player.pos, 20);
+		play_effect(all_players(Team.ALL), Effect.GOOD_PICKUP_EFFECT, Color.GREEN, event_player.pos, 5);
+	}
+
+	// spawn effect on pillar
+	if(S == 1) {
+		P = vec(0, 95, 130);
+	}
+
+	// spawn effect on point 2 door
+	if(S == 2) {
+		P = vec(0, 94, 162);
+	}
+
+	// spawn effect on rock red size
+	if(S == 3) {
+		P = vec(-26, 94, 150);
+	}
+
+	// spawn effect on rock blue side
+	if(S == 4) {
+		P = vec(26, 94, 150);
+	}
+
+	// spawn effect on point
+	if(S == 5) {
+		
+	}
+}
+

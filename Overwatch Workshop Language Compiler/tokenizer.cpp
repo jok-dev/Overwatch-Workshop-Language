@@ -8,18 +8,52 @@
 
 const char operators[] = { '+', '-', '*', '/', '%', '^', '&', '|', '!', '>', '<', '=' };
 
-const char punctuation[] = { '(', ')', '{', '}', ',', ';', '"' };
+const char punctuation[] = { '(', ')', '{', '}', ',', ';', '"', '.' };
 
 const char* keywords[] = { "if", "event", "true", "false" };
 
 const char* code;
 
 u64 code_len;
+
 u64 pos = 0;
+u64 current_line_start_pos = 0;
+u64 current_line = 1;
+
 char current_char;
 
 bool has_current_token = false;
 token current_token;
+
+// tokens stay in memory for 1 token_next call
+bool has_last_token = false;
+token last_token;
+
+// @Todo: move to charstream??
+bool char_end()
+{
+	return pos >= code_len;
+}
+
+bool char_end_further()
+{
+	return pos + 1 >= code_len;
+}
+
+char char_peek()
+{
+	return code[pos];
+}
+
+char char_peek_further()
+{
+	return code[pos + 1];
+}
+
+char char_next()
+{
+	return current_char = code[pos++];
+}
 
 void tokenizer_init(const char* code_lines)
 {
@@ -53,27 +87,22 @@ u32 token_get_length(token tok)
 	return tok.value->len;
 }
 
-u64 tokenizer_get_pos()
+u64 tokenizer_get_current_line()
 {
-	return max(0, pos - token_get_length(token_peek()));
+	return current_line;
 }
 
-bool char_end()
+u64 tokenizer_get_current_line_pos()
 {
-	return pos >= code_len;
-}
-
-char char_peek()
-{
-	return code[pos];
-}
-
-char char_next()
-{
-	return current_char = code[pos++];
+	return pos - current_line_start_pos;
 }
 
 // token character type checks
+bool is_digit_start_char(char ch)
+{
+	return isdigit(ch);
+}
+
 bool is_digit_char(char ch)
 {
 	return isdigit(ch) || ch == '.';
@@ -96,12 +125,12 @@ bool is_punctuation_char(char ch)
 bool is_identifier_start_char(char ch)
 {
 	// identifiers can start with anything apart from digits, operators or punctuation or space
-	return isalpha(ch) || (!is_digit_char(ch) && !is_operator_char(ch) && !is_punctuation_char(ch) && ch != ' ');
+	return isalpha(ch) || (!is_digit_start_char(ch) && !is_operator_char(ch) && !is_punctuation_char(ch) && ch != ' ');
 }
 
 bool is_identifier_char(char ch)
 {
-	return is_identifier_start_char(ch) || is_digit_char(ch);
+	return is_identifier_start_char(ch) || is_digit_start_char(ch);
 }
 
 bool is_identifier_keyword(dynstr* iden)
@@ -225,17 +254,35 @@ token token_read_identifier()
 token token_next_internal()
 {
 	// eat whitespace
-	while(!char_end() && char_peek() == ' ') char_next();
+	while(!char_end() && (char_peek() == ' ' || char_peek() == '\n' || char_peek() == '\t'))
+	{
+		if(char_peek() == '\n')
+		{
+			current_line_start_pos = pos;
+			current_line++;
+		}
+
+		char_next();
+	}
 
 	// no token to read because we're at the end of the code
 	if(char_end()) return { TOKEN_TYPE_END };
 
 	char ch = char_peek();
 
-	// @Todo: comment support
+	// comment
+	if(char_peek() == '/' && !char_end_further() && char_peek_further() == '/')
+	{
+		// skip till newline
+		while(!char_end() && char_next() != '\n');
+
+		current_line++;
+
+		return token_next_internal();
+	}
 
 	if(ch == '"') return token_read_string();
-	if(is_digit_char(ch)) return token_read_digit();
+	if(is_digit_start_char(ch)) return token_read_digit();
 	if(is_identifier_start_char(ch)) return token_read_identifier();
 	if(is_punctuation_char(ch)) return token_read_punctuation();
 	if(is_operator_char(ch)) return token_read_operator();
@@ -244,14 +291,18 @@ token token_next_internal()
 	assert(false && "Failed to parse character");
 }
 
+// @Todo: move up like we did for parser?
 token token_next()
 {
-	if(has_current_token && current_token.type != TOKEN_TYPE_END)
+	if(has_last_token && last_token.type != TOKEN_TYPE_END)
 	{
-		dynstr_destroy(current_token.value);
+		dynstr_destroy(last_token.value);
 	}
 
 	token tok = token_next_internal();
+
+	has_last_token = has_current_token;
+	if(has_last_token) last_token = current_token;
 
 	has_current_token = true;
 	current_token = tok;
