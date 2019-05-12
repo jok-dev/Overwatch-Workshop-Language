@@ -18,6 +18,7 @@ struct dynstr
 dynstr* dynstr_create(char* str);
 dynstr* dynstr_create(char* str, u32 len);
 dynstr* dynstr_create(u32 buf_len);
+dynstr* dynstr_create(dynstr* dstr);
 
 void dynstr_destroy(dynstr* str);
 
@@ -37,4 +38,4 @@ dynstr* dynstr_clear(dynstr* dstr);
 // move the start of the string forward
 dynstr* dynstr_trim_start(dynstr* dstr, u32 amount);
 
-bool dynstr_equals(dynstr* dstr, char* other);
+bool dynstr_equals(dynstr* dstr, const char* other);

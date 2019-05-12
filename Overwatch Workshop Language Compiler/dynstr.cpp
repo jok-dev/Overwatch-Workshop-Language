@@ -38,6 +38,11 @@ dynstr* dynstr_create(char* str)
 	return dynstr_create(str, (u16)len, (u16)len);
 }
 
+dynstr* dynstr_create(dynstr* dstr)
+{
+	return dynstr_create(dstr->raw, dstr->len, dstr->buf_len);
+}
+
 dynstr* dynstr_create(u32 buf_len)
 {
 	return dynstr_create(0, 0, buf_len);
@@ -217,7 +222,7 @@ dynstr* dynstr_trim_start(dynstr* dstr, u32 amount)
 	return dstr;
 }
 
-bool dynstr_equals(dynstr* dstr, char* other)
+bool dynstr_equals(dynstr* dstr, const char* other)
 {
 	return strcmp(dstr->raw, other) == 0;
 }
