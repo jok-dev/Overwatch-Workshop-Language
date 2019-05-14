@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "DXGICaptureSample.h"
+#include "screenshot_analyze.h"
 
 // @Todo: we could add a printing of the parser intention stack on error?
 
@@ -108,18 +109,11 @@ BOOL CALLBACK EnumWindowsProc(HWND wnd, LPARAM param)
 
 	SetForegroundWindow(wnd);
 
-	RECT rec;
-	POINT top_left = {0};
+	// @Todo: check that the window is not off the screen
+	// @Todo: detect focus change to cancel
+	// @Todo: detect mouse move to cancel
 
-	GetClientRect(wnd, &rec);
-	assert(ClientToScreen(wnd, &top_left));
-	rec.left = top_left.x;
-	rec.top = top_left.y;
-	rec.right += rec.left;
-	rec.bottom += rec.top;
-
-
-	run(rec);
+	analyze_screenshot(wnd);
 
 	return false;
 
@@ -238,6 +232,6 @@ int main()
 
 	printf("\n");
 
-	system("PAUSE");
+	//system("PAUSE");
 	exit(0);
 }

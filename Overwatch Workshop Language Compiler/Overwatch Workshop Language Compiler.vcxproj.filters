@@ -48,6 +48,9 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="screenshot_analyze.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dynstr.h">
@@ -78,6 +81,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="DXGICaptureSample.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="screenshot_analyze.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

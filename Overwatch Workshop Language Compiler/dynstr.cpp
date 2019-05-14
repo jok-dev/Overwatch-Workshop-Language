@@ -1,5 +1,7 @@
 #include "dynstr.h"
 
+#include <Windows.h>
+
 dynstr* dynstr_create(const char* str, u32 str_len, u32 buf_len)
 {
 	assert(str_len >= 0 && buf_len >= 0 && "You can't have a negatively sized string or buffer");

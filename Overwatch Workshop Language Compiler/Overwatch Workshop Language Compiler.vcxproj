@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -28,26 +28,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -70,10 +70,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>$(DXSDK_DIR)Lib\x64</LinkIncremental>
+    <LinkIncremental>
+    </LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LinkIncremental>$(DXSDK_DIR)Lib\x64</LinkIncremental>
+    <LinkIncremental>
+    </LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -88,7 +90,8 @@
       <SubSystem>Console</SubSystem>
       <StackReserveSize>
       </StackReserveSize>
-      <AdditionalLibraryDirectories>$(DXSDK_DIR)Lib\x86</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
       <AdditionalDependencies>D3D11.lib;dxgi.lib;gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -106,6 +109,7 @@
       <StackReserveSize>
       </StackReserveSize>
       <AdditionalDependencies>D3D11.lib;dxgi.lib;gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -125,7 +129,8 @@
       <SubSystem>Console</SubSystem>
       <StackReserveSize>
       </StackReserveSize>
-      <AdditionalLibraryDirectories>$(DXSDK_DIR)Lib\x86</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
       <AdditionalDependencies>D3D11.lib;dxgi.lib;gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -147,6 +152,7 @@
       <StackReserveSize>
       </StackReserveSize>
       <AdditionalDependencies>D3D11.lib;dxgi.lib;gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -158,6 +164,7 @@
     <ClCompile Include="general.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parser.cpp" />
+    <ClCompile Include="screenshot_analyze.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="test.cpp" />
     <ClCompile Include="lexer.cpp" />
@@ -171,6 +178,7 @@
     <ClInclude Include="general.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="parser.h" />
+    <ClInclude Include="screenshot_analyze.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>

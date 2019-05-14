@@ -7,6 +7,8 @@
 #include <gdiplus.h>
 #include <assert.h>
 
+#include "screenshot_analyze.h"
+
 bool initalized = false;
 
 CaptureSource capture_source;
@@ -532,6 +534,43 @@ HRESULT get_output_bits(BYTE* pBits, RECT& rcDest)
 	return hr;
 }
 
+void init_screenshot()
+{
+	// init
+	SetRect(&rc_current_output, 0, 0, 0, 0);
+	buffer = NULL;
+	dxgi_pointer = NULL;
+
+	// init com library
+	CoInitialize(NULL);
+
+	capture_source = CSDesktop;
+
+	CComPtr<IWICImagingFactory> spWICFactory = NULL;
+	HRESULT hr = spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
+
+	assert(!FAILED(hr));
+}
+
+void take_screenshot(void* buffer_mem, RECT rec)
+{
+	DWORD dwWidth = rec.right - rec.left;
+	DWORD dwHeight = rec.bottom - rec.top;
+
+	DWORD dwBufSize = dwWidth * dwHeight * 4;
+
+	HRESULT hr;
+
+	int i = 0;
+	do
+	{
+		hr = get_output_bits((BYTE*) buffer_mem, rec);
+		i++;
+	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
+
+	assert(!FAILED(hr));
+}
+
 HRESULT run(RECT rec)
 {
 	printf("DXGICaptureSample. Fast windows screen capture\n");
@@ -560,7 +599,7 @@ HRESULT run(RECT rec)
 
 	CComPtr<IWICImagingFactory> spWICFactory = NULL;
 	HRESULT hr = spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
-	if(FAILED(hr))
+	if (FAILED(hr))
 		return hr;
 
 	int i = 0;
@@ -568,13 +607,15 @@ HRESULT run(RECT rec)
 	{
 		hr = get_output_bits(pBuf, rec);
 		i++;
-	} while(hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
+	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
 
-	if(FAILED(hr))
+	if (FAILED(hr))
 	{
 		printf("GetOutputBits failed with hr=0x%08x\n", hr);
 		return hr;
 	}
+
+	return S_OK;
 
 	printf("Saving capture to file\n");
 

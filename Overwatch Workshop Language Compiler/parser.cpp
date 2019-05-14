@@ -182,7 +182,8 @@ ast_node parse_atom()
 
 	token tok = token_peek();
 
-	ast_node node = { AST_NODE_TYPE_END };
+	ast_node node = { };
+	node.type = AST_NODE_TYPE_END;
 
 	if(tok.type == TOKEN_TYPE_END) return node;
 
