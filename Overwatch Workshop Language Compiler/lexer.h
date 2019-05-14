@@ -20,12 +20,12 @@ struct token
 	dynstr* value;
 };
 
-void tokenizer_init(const char* code_lines);
+void lexer_init(const char* code_lines);
 
 const char* token_type_get_name(token_type type);
 
 token token_next();
 token token_peek();
 
-u64 tokenizer_get_current_line();
-u64 tokenizer_get_current_line_pos();
+u64 lexer_get_current_line();
+u64 lexer_get_current_line_pos();

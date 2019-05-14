@@ -1,4 +1,4 @@
-#include "tokenizer.h"
+#include "lexer.h"
 
 #include <string.h>
 
@@ -55,7 +55,7 @@ char char_next()
 	return current_char = code[pos++];
 }
 
-void tokenizer_init(const char* code_lines)
+void lexer_init(const char* code_lines)
 {
 	code = code_lines;
 	code_len = strlen(code);
@@ -87,12 +87,12 @@ u32 token_get_length(token tok)
 	return tok.value->len;
 }
 
-u64 tokenizer_get_current_line()
+u64 lexer_get_current_line()
 {
 	return current_line;
 }
 
-u64 tokenizer_get_current_line_pos()
+u64 lexer_get_current_line_pos()
 {
 	return pos - current_line_start_pos;
 }

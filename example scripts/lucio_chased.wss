@@ -109,16 +109,17 @@
 //     know which player has certain variables.. very odd..
 //
 
-
 // The below example is based on Lucio Chased by discord user semtimmy#4618 (share code: WF0GV)
 
 event(Event.ONGOING_GLOBAL) {
+	this.that.fucker();
+
 	// disable logic
-	if(is_game_in_progress() == true) {
+	if(is_game_in_progress() == true || true == true) {
 		disable_builtin_game_mode_announcer();
 		disable_builtin_game_mode_scoring();
 		disable_builtin_game_mode_completion();
-		disable_builtin_game_mode_respawning(players_on_hero(Hero.LUCIO), Team.ALL);
+		disable_builtin_game_mode_respawning(players_on_hero(Hero.LUCIO, Team.ALL));
 	}
 
 	// set teamscore to players alive

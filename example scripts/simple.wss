@@ -1,3 +1,4 @@
-event(Event.ONGOING_GLOBAL) {
-	disable_builtin_game_mode_announcer();
+if(2 * 3 == 4)
+{
+	do_something();
 }

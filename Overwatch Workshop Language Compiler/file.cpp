@@ -14,16 +14,14 @@ file_data* file_load(char* path)
 	fseek(file, 0, SEEK_SET);
 
 	// pack the struct and file data into one memory allocation
-	file_data* data = (file_data*) malloc(sizeof(file_data) + file_size + 1);
+	file_data* data = (file_data*) calloc(sizeof(file_data) + file_size + 1, 1);
 
 	// the data pointer is after the struct data
 	void* file_buffer = (void*) ((char*) data + sizeof(file_data));
 	data->length = file_size;
 	data->data = file_buffer;
 
-	fread_s(file_buffer, file_size, file_size, 1, file);
-
-	((char*) data->data)[file_size - 2] = 0;
+	size_t count = fread_s(file_buffer, file_size + 1, file_size, 1, file);
 
 	fclose(file);
 
