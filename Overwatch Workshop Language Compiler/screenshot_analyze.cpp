@@ -5,6 +5,8 @@
 
 #include <Windows.h>
 
+#include <queue>
+
 bool running;
 void* bitmap_memory;
 BITMAPINFO info = {};
@@ -12,6 +14,10 @@ BITMAPINFO info = {};
 #define BUTTON_RED 28
 #define BUTTON_GREEN 117
 #define BUTTON_BLUE 188
+
+#define BUTTON2_RED 200
+#define BUTTON2_GREEN 37
+#define BUTTON2_BLUE 59
 
 void repaint(HDC hdc, u32 width, u32 height)
 {
@@ -102,11 +108,156 @@ void byreke(u32 width, u32 height, RECT rec)
 		{
 			u8* pixel = (u8*)((u32*) bitmap_memory + x + (y * width));
 
-			if (pixel[2] == BUTTON_RED && pixel[1] == BUTTON_GREEN && pixel[0] == BUTTON_BLUE)
+			u8 blue = pixel[0];
+			u8 green = pixel[1];
+			u8 red = pixel[2];
+
+			if (red == BUTTON_RED && green == BUTTON_GREEN && blue == BUTTON_BLUE)
+			{
+				pixel[0] = 255;
+				pixel[1] = 0;
+				pixel[2] = 0;
+			}
+		}
+	}
+
+	u32 tol = 10;
+	
+	for(u32 x = 0; x < width; x++)
+	{
+		for(u32 y = 0; y < height; y++)
+		{
+			u8* pixel = (u8*)((u32*)bitmap_memory + x + (y * width));
+
+			u8 blue = pixel[0];
+			u8 green = pixel[1];
+			u8 red = pixel[2];
+
+			if(red == BUTTON2_RED && green == BUTTON2_GREEN && blue == BUTTON2_BLUE)
 			{
 				pixel[0] = 0;
 				pixel[1] = 0;
 				pixel[2] = 0;
+
+				struct pos
+				{
+					u32 x, y;
+				};
+
+				queue<pos> q;
+
+				pos start = { x, y };
+				q.push(start);
+
+				while(q.size() > 0)
+				{
+					pos s = q.front();
+
+
+					{
+						u32 nx = s.x + 1;
+						u32 ny = s.y;
+
+						u8* search_pixel = (u8*)((u32*)bitmap_memory + nx + (ny * width));
+						u8 sblue = search_pixel[0];
+						u8 sgreen = search_pixel[1];
+						u8 sred = search_pixel[2];
+
+						u8 bdelta = max(sblue, blue) - min(sblue, blue);
+						u8 gdelta = max(sgreen, green) - min(sgreen, green);
+						u8 rdelta = max(sred, red) - min(sred, red);
+
+						if(!(sblue == 0 && sgreen == 0 && sred == 0) && bdelta <= tol && gdelta <= tol && rdelta <= tol)
+						{
+							search_pixel[0] = 0;
+							search_pixel[1] = 0;
+							search_pixel[2] = 0;
+
+							pos f = { nx, ny };
+
+							q.push(f);
+						}
+					}
+
+					{
+						u32 nx = s.x - 1;
+						u32 ny = s.y;
+
+						u8* search_pixel = (u8*)((u32*)bitmap_memory + nx + (ny * width));
+						u8 sblue = search_pixel[0];
+						u8 sgreen = search_pixel[1];
+						u8 sred = search_pixel[2];
+
+						u8 bdelta = max(sblue, blue) - min(sblue, blue);
+						u8 gdelta = max(sgreen, green) - min(sgreen, green);
+						u8 rdelta = max(sred, red) - min(sred, red);
+
+						if(!(sblue == 0 && sgreen == 0 && sred == 0) && bdelta <= tol && gdelta <= tol && rdelta <= tol)
+						{
+							search_pixel[0] = 0;
+							search_pixel[1] = 0;
+							search_pixel[2] = 0;
+
+							pos f = { nx, ny };
+
+							q.push(f);
+						}
+					}
+
+					{
+						u32 nx = s.x;
+						u32 ny = s.y + 1;
+
+						u8* search_pixel = (u8*)((u32*)bitmap_memory + nx + (ny * width));
+						u8 sblue = search_pixel[0];
+						u8 sgreen = search_pixel[1];
+						u8 sred = search_pixel[2];
+
+						u8 bdelta = max(sblue, blue) - min(sblue, blue);
+						u8 gdelta = max(sgreen, green) - min(sgreen, green);
+						u8 rdelta = max(sred, red) - min(sred, red);
+
+						if(!(sblue == 0 && sgreen == 0 && sred == 0) && bdelta <= tol && gdelta <= tol && rdelta <= tol)
+						{
+							search_pixel[0] = 0;
+							search_pixel[1] = 0;
+							search_pixel[2] = 0;
+
+							pos f = { nx, ny };
+
+							q.push(f);
+						}
+					}
+
+					{
+						u32 nx = s.x;
+						u32 ny = s.y - 1;
+
+						u8* search_pixel = (u8*)((u32*)bitmap_memory + nx + (ny * width));
+						u8 sblue = search_pixel[0];
+						u8 sgreen = search_pixel[1];
+						u8 sred = search_pixel[2];
+
+						u8 bdelta = max(sblue, blue) - min(sblue, blue);
+						u8 gdelta = max(sgreen, green) - min(sgreen, green);
+						u8 rdelta = max(sred, red) - min(sred, red);
+
+						if(!(sblue == 0 && sgreen == 0 && sred == 0) && bdelta <= tol && gdelta <= tol && rdelta <= tol)
+						{
+							search_pixel[0] = 0;
+							search_pixel[1] = 0;
+							search_pixel[2] = 0;
+
+							pos f = { nx, ny };
+
+							q.push(f);
+						}
+					}
+
+					q.pop();
+				}
+
+				return;
 			}
 		}
 	}
